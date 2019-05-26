@@ -7,6 +7,9 @@ defmodule PersistentGenServer.Application do
     children = [
       {Registry, keys: :unique, name: PersistentGenServer.Registry}
     ]
+
+    :ets.new(PersistentGenServer.Storage.ETS, [:set, :public, :named_table])
+
     Supervisor.start_link(children, strategy: :one_for_one)
   end
 end

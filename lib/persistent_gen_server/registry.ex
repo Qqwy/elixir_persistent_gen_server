@@ -11,13 +11,16 @@ defmodule PersistentGenServer.Registry do
       :undefined ->
         # TODO try loading from persistency
         # TODO fix infinite loading loop.
-        IO.inspect("I would like to load it here")
         case PersistentGenServer.Storage.ETS.read({module_name, init_args}) do
           {:ok, val} ->
-            {:ok, pid} = GenServer.start(PersistentGenServer, {module_name, init_args}, [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
+            IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
+            {:ok, pid} = GenServer.start(PersistentGenServer, {module_name, init_args, :revive, val}) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
             pid
-          :not_found -> :undefined
-          {:error, reason} -> raise reason
+          :not_found ->
+            IO.inspect({"Attempting to load module from persistency, but was not found", module_name, init_args})
+            :undefined
+          {:error, reason} ->
+            raise reason
         end
     end
   end

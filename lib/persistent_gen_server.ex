@@ -18,7 +18,7 @@ defmodule PersistentGenServer do
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
     gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
-    GenServer.start_link(__MODULE__, {module, init_args}, gen_server_options)
+    GenServer.start_link(__MODULE__, {module, init_args, :initial}, gen_server_options)
 
     {:ok, gen_server_options[:name]}
   end
@@ -27,19 +27,24 @@ defmodule PersistentGenServer do
     # TODO extract/use persistency options
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
-    GenServer.start(__MODULE__, {module, init_args}, gen_server_options)
+    GenServer.start(__MODULE__, {module, init_args, :initial}, gen_server_options)
 
     {:ok, gen_server_options[:name]}
   end
 
-  def init({module, init_args}) do
+  def init({module, init_args, :initial}) do
     with {:ok, internal_state} <- module.init(init_args),
          state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
-           :ok <- persist!(state),
+           :ok <- persist!(state) # ,
            # PersistentGenServer.Registry.register_name({module, init_args}, self())
       do
            {:ok, state}
     end
+  end
+
+  def init({module, init_args, :revive, state}) do
+    PersistentGenServer.Registry.register_name({module, init_args}, self())
+    {:ok, state}
   end
 
   def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
