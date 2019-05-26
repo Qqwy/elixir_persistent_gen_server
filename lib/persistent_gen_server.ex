@@ -5,11 +5,22 @@ defmodule PersistentGenServer do
 
   defstruct [:module, :init_args, :internal_state, storage_impl: PersistentGenServer.Storage.ETS]
 
+
+  @doc """
+  Starts the GenServer `module` with `init_args`.
+
+  This function returns `{:ok, pid}` where `pid` is actually
+  a `{:via, PersistentGenServer.Registry, ...}` tuple, which you
+  can store and re-use to call the persistent GenServer later, even if stopped running in the meantime.
+  """
   def start_link(module, init_args, gen_server_options \\ []) do
     # TODO extract/use persistency options
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
+    gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
     GenServer.start_link(__MODULE__, {module, init_args}, gen_server_options)
+
+    {:ok, gen_server_options[:name]}
   end
 
   def start(module, init_args, gen_server_options \\ []) do
@@ -17,6 +28,8 @@ defmodule PersistentGenServer do
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
     GenServer.start(__MODULE__, {module, init_args}, gen_server_options)
+
+    {:ok, gen_server_options[:name]}
   end
 
   def init({module, init_args}) do
@@ -54,6 +67,7 @@ defmodule PersistentGenServer do
   end
 
   def handle_cast(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    IO.puts({call, state}, label: "A")
     case module.handle_cast(call, internal_state) do
       {:noreply, new_state} ->
         {:noreply, update_and_persist(state, new_state)}
