@@ -13,6 +13,8 @@ defmodule PersistentGenServer.Storage.ETS do
       :ets.new(__MODULE__, [:set, :public, :named_table])
     end
 
+    IO.inspect({identity_tuple, value}, label: "storing")
+
     :ets.insert(__MODULE__, {identity_tuple, value})
     :ok
   end

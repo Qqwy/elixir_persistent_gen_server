@@ -35,7 +35,9 @@ defmodule PersistentGenServer do
   def init({module, init_args}) do
     with {:ok, internal_state} <- module.init(init_args),
          state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
-           :ok <- persist!(state) do
+           :ok <- persist!(state),
+           # PersistentGenServer.Registry.register_name({module, init_args}, self())
+      do
            {:ok, state}
     end
   end
@@ -67,7 +69,6 @@ defmodule PersistentGenServer do
   end
 
   def handle_cast(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
-    IO.puts({call, state}, label: "A")
     case module.handle_cast(call, internal_state) do
       {:noreply, new_state} ->
         {:noreply, update_and_persist(state, new_state)}
