@@ -1,6 +1,24 @@
 defmodule PersistentGenServer do
   @moduledoc """
   PersistentGenServer makes your GenServers Persistent!
+
+
+  # TODO possible dimensions for configurability:
+
+  - Swap out process registries that PersistentGenServer.Registry wraps.
+  - Optionally Auto-start GenServers when called for the first time with a `:via`-tuple when not persisted yet. (Current behaviour is to require at least once a manual start using `start`/ `start_link`)
+  - Let users choose between:
+    - Wipe persistency for GenServer when it stops normally or crashes.
+    - Wipe persistency for GenServer only when it stops normally.
+    - Even restart GenServer from persistency when it crashed before.
+  - Other storage adapters.
+
+
+  # Things to figure out:
+
+  - How to re-create original link/monitor structure? Is there a way for a process to keep track of its supervision?
+
+
   """
 
   defstruct [:module, :init_args, :internal_state, storage_impl: PersistentGenServer.Storage.ETS]
