@@ -13,6 +13,8 @@ defmodule PersistentGenServer do
     - Wipe persistency for GenServer only when it stops normally.
     - Even restart GenServer from persistency when it crashed before.
   - Other storage adapters.
+  - Timeout length before a process petrifies itself.
+  - Only write to cache on `terminate` vs during each handle_* for efficienty vs fault-tolerancy?
 
 
   # Things to figure out:
