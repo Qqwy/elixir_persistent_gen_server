@@ -3,21 +3,23 @@ defmodule PersistentGenServer do
   PersistentGenServer makes your GenServers Persistent!
   """
 
-  defstruct [:module, :init_options, :internal_state]
+  defstruct [:module, :init_args, :internal_state, :storage_impl]
 
-  def start_link(module, init_options, gen_server_options \\ []) do
+  def start_link(module, init_args, gen_server_options \\ []) do
     # TODO extract/use persistency options
-    GenServer.start_link(__MODULE__, {module, init_options}, gen_server_options)
+    # TODO don't start if GenServer already is started?
+    GenServer.start_link(__MODULE__, {module, init_args}, gen_server_options)
   end
 
-  def start(module, init_options, gen_server_options \\ []) do
+  def start(module, init_args, gen_server_options \\ []) do
     # TODO extract/use persistency options
-    GenServer.start(__MODULE__, {module, init_options}, gen_server_options)
+    # TODO don't start if GenServer already is started?
+    GenServer.start(__MODULE__, {module, init_args}, gen_server_options)
   end
 
-  def init({module, init_options}) do
-    with {:ok, internal_state} <- module.init(init_options) do
-      {:ok, %__MODULE__{module: module, init_options: init_options, internal_state: internal_state}}
+  def init({module, init_args}) do
+    with {:ok, internal_state} <- module.init(init_args) do
+      {:ok, %__MODULE__{module: module, init_args: init_args, internal_state: internal_state}}
     # TODO persist
       |> persist()
     end
@@ -64,17 +66,46 @@ defmodule PersistentGenServer do
     end
   end
 
-  # def handle_info(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
-  #   # TODO
-  # end
+  def handle_continue(continue, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    case module.handle_continue(continue, internal_state) do
+      {:noreply, new_state} ->
+        {:noreply, update_and_persist(state, new_state)}
+      {:noreply, new_state, extra} ->
+        {:noreply, update_and_persist(state, new_state), extra}
 
-  defp persist(state) do
+      {:stop, reason, new_state} ->
+        # TODO: Remove state from persistency?
+        {:stop, reason, update_and_persist(state, new_state)}
+      other ->
+        other
+    end
+  end
+
+  def handle_info(msg, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    case module.handle_info(msg, internal_state) do
+      {:noreply, new_state} ->
+        {:noreply, update_and_persist(state, new_state)}
+      {:noreply, new_state, extra} ->
+        {:noreply, update_and_persist(state, new_state), extra}
+
+      {:stop, reason, new_state} ->
+        # TODO: Remove state from persistency?
+        {:stop, reason, update_and_persist(state, new_state)}
+      other ->
+        other
+    end
+  end
+
+  defp persist!(state) do
     IO.inspect state, label: "persisting state"
+
+    # TODO nicer error handling
+    :ok = state.storage_impl.store({state.module, state.init_args}, state)
   end
 
   defp update_and_persist(old_state, new_internal_state) do
     new_state = put_in old_state.internal_state, new_internal_state
-    persist(new_state)
+    persist!(new_state)
 
     new_state
   end
