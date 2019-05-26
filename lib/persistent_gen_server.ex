@@ -15,6 +15,7 @@ defmodule PersistentGenServer do
   - Other storage adapters.
   - Timeout length before a process petrifies itself.
   - Only write to cache on `terminate` vs during each handle_* for efficienty vs fault-tolerancy?
+  - A mapping function between the actual state and the state-to-be-persisted/reloaded, to hide ephemeral parts.
 
 
   # Things to figure out:
