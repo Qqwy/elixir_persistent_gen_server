@@ -1,12 +1,10 @@
 defmodule PersistentGenServer.Storage do
-  @spec store(tuple(), any()) :: :ok | {:error, reason}
-  defcallback store(identity_tuple, state)
+  @callback store(tuple(), any()) :: :ok | {:error, reason :: any()}
 
-  @spec read(tuple()) :: {:ok, any()} | :not_found | {:error, reason}
-  defcallback read(identity_tuple)
+  @callback read(tuple()) :: {:ok, any()} | :not_found | {:error, reason :: any()}
 end
 
-defmodule PersistenGenServer.Storage.ETS do
+defmodule PersistentGenServer.Storage.ETS do
   @behaviour PersistentGenServer.Storage
 
   @impl true
@@ -15,10 +13,11 @@ defmodule PersistenGenServer.Storage.ETS do
       :ets.new(__MODULE__, [:set, :public, :named_table])
     end
 
-    :ets.insert({identity_tuple, value})
+    :ets.insert(__MODULE__, {identity_tuple, value})
     :ok
   end
 
+  @impl true
   def read(identity_tuple) do
     if :ets.whereis(__MODULE__) == :undefined  do
       :ets.new(__MODULE__, [:set, :public, :named_table])

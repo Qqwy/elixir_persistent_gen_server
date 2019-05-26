@@ -3,25 +3,27 @@ defmodule PersistentGenServer do
   PersistentGenServer makes your GenServers Persistent!
   """
 
-  defstruct [:module, :init_args, :internal_state, :storage_impl]
+  defstruct [:module, :init_args, :internal_state, storage_impl: PersistentGenServer.Storage.ETS]
 
   def start_link(module, init_args, gen_server_options \\ []) do
     # TODO extract/use persistency options
     # TODO don't start if GenServer already is started?
+    # TODO load from persistency if persisted before
     GenServer.start_link(__MODULE__, {module, init_args}, gen_server_options)
   end
 
   def start(module, init_args, gen_server_options \\ []) do
     # TODO extract/use persistency options
     # TODO don't start if GenServer already is started?
+    # TODO load from persistency if persisted before
     GenServer.start(__MODULE__, {module, init_args}, gen_server_options)
   end
 
   def init({module, init_args}) do
-    with {:ok, internal_state} <- module.init(init_args) do
-      {:ok, %__MODULE__{module: module, init_args: init_args, internal_state: internal_state}}
-    # TODO persist
-      |> persist()
+    with {:ok, internal_state} <- module.init(init_args),
+         state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
+           :ok <- persist!(state) do
+           {:ok, state}
     end
   end
 
