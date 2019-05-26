@@ -1,18 +1,79 @@
 defmodule PersistentGenServer do
   @moduledoc """
-  Documentation for PersistentGenServer.
+  PersistentGenServer makes your GenServers Persistent!
   """
 
-  @doc """
-  Hello world.
+  defstruct [:module, :init_options, :internal_state]
 
-  ## Examples
+  def start_link(module, init_options, gen_server_options \\ []) do
+    # TODO extract/use persistency options
+    GenServer.start_link(__MODULE__, {module, init_options}, gen_server_options)
+  end
 
-      iex> PersistentGenServer.hello()
-      :world
+  def start(module, init_options, gen_server_options \\ []) do
+    # TODO extract/use persistency options
+    GenServer.start(__MODULE__, {module, init_options}, gen_server_options)
+  end
 
-  """
-  def hello do
-    :world
+  def init({module, init_options}) do
+    with {:ok, internal_state} <- module.init(init_options) do
+      {:ok, %__MODULE__{module: module, init_options: init_options, internal_state: internal_state}}
+    # TODO persist
+      |> persist()
+    end
+  end
+
+  def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    # put_in state.internal_state, module.handle_call(call, internal_state)
+    # # TODO persist
+    # |> persist()
+    case module.handle_call(call, from, internal_state) do
+      {:reply, reply, new_state} ->
+        {:reply, reply, update_and_persist(state, new_state)}
+      {:reply, reply, new_state, extra} ->
+        {:reply, reply, update_and_persist(state, new_state), extra}
+
+      {:noreply, reply, new_state} ->
+        {:noreply, reply, update_and_persist(state, new_state)}
+      {:noreply, reply, new_state, extra} ->
+        {:noreply, reply, update_and_persist(state, new_state), extra}
+
+      {:stop, reason, reply, new_state} ->
+        # TODO: Remove state from persistency?
+        {:stop, reason, reply, update_and_persist(state, new_state)}
+      {:stop, reason, new_state} ->
+        # TODO: Remove state from persistency?
+        {:stop, reason, update_and_persist(state, new_state)}
+      other ->
+        other
+    end
+  end
+
+  def handle_cast(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    case module.handle_cast(call, internal_state) do
+      {:noreply, new_state} ->
+        {:noreply, update_and_persist(state, new_state)}
+      {:noreply, new_state, extra} ->
+        {:noreply, update_and_persist(state, new_state), extra}
+
+      {:stop, reason, new_state} ->
+        # TODO: Remove state from persistency?
+        {:stop, reason, update_and_persist(state, new_state)}
+      other ->
+        other
+    end
+  end
+
+  def handle_info(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    # TODO
+  end
+
+  defp persist(state) do
+    IO.inspect state, label: "persisting state"
+  end
+
+  defp update_and_persist(old_state, new_internal_state) do
+    put_in state.internal_state new_internal_state
+    |> persist()
   end
 end
