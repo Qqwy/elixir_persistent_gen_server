@@ -1,0 +1,3 @@
+%{
+  "specify": {:hex, :specify, "0.4.4", "c4f0ca7a2e5f604602db917e09215ae5b044f43c3e4518f48fe1196a125cbb39", [:mix], [], "hexpm"},
+}
