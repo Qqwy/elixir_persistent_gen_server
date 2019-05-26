@@ -1,4 +1,5 @@
 defmodule PersistentGenServer do
+  use GenServer
   @moduledoc """
   PersistentGenServer makes your GenServers Persistent!
 
@@ -7,7 +8,7 @@ defmodule PersistentGenServer do
 
   - Swap out process registries that PersistentGenServer.Registry wraps.
   - Optionally Auto-start GenServers when called for the first time with a `:via`-tuple when not persisted yet. (Current behaviour is to require at least once a manual start using `start`/ `start_link`)
-  - Let users choose between:
+  - Let users choose between: (temporary/transient/permanent)
     - Wipe persistency for GenServer when it stops normally or crashes.
     - Wipe persistency for GenServer only when it stops normally.
     - Even restart GenServer from persistency when it crashed before.
@@ -36,7 +37,10 @@ defmodule PersistentGenServer do
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
     gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
-    GenServer.start_link(__MODULE__, {module, init_args, :initial}, gen_server_options)
+    # NOTE: WE piggyback the call to the module's init in the call to our init, in the call to `GenServer.start_llink` in the child spec expected for DynamicSupervisor.start_child
+    # Can possibly be refactored somewhat :-)
+    res = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args, :initial}, gen_server_options]}})
+    IO.inspect(res, label: "DynamicSupervisor result")
 
     {:ok, gen_server_options[:name]}
   end

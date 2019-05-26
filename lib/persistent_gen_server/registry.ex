@@ -13,7 +13,7 @@ defmodule PersistentGenServer.Registry do
         case PersistentGenServer.Storage.ETS.read({module_name, init_args}) do
           {:ok, val} ->
             IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
-            {:ok, pid} = GenServer.start(PersistentGenServer, {module_name, init_args, :revive, val}) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
+            {:ok, pid} = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: PersistentGenserver, start: {GenServer, :start_link, [PersistentGenServer, {module_name, init_args, :revive, val}]}}) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
             pid
           :not_found ->
             IO.inspect({"Attempting to load module from persistency, but was not found", module_name, init_args})
