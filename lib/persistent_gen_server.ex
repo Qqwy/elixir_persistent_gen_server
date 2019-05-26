@@ -64,16 +64,18 @@ defmodule PersistentGenServer do
     end
   end
 
-  def handle_info(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
-    # TODO
-  end
+  # def handle_info(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
+  #   # TODO
+  # end
 
   defp persist(state) do
     IO.inspect state, label: "persisting state"
   end
 
   defp update_and_persist(old_state, new_internal_state) do
-    put_in state.internal_state new_internal_state
-    |> persist()
+    new_state = put_in old_state.internal_state, new_internal_state
+    persist(new_state)
+
+    new_state
   end
 end
