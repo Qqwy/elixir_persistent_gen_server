@@ -2,39 +2,23 @@ defmodule PersistentGenServerTest do
   use ExUnit.Case
   doctest PersistentGenServer
 
-  defmodule Example do
-    defstruct [name: "", score: 42]
-    use GenServer
+  use ExUnit.Case, async: true
 
-    def start_link_ephemeral(name) do
-      GenServer.start_link(__MODULE__, name)
-    end
+  describe "the example GenServer works as expected without being wrapped by PersistentGenServer" do
+    test "Basic operation" do
+      {:ok, pid} = Example.start_link_ephemeral("Vorpal")
 
-    def start_link_persistent(name) do
-      PersistentGenServer.start_link(__MODULE__, name)
-    end
+      assert 0 == Example.read_score(pid)
+      Example.increment_score(pid)
+      assert 1 == Example.read_score(pid)
 
-    def increment_score(pid) do
-      GenServer.cast(pid, :increment_score)
-    end
+      Example.increment_score(pid)
+      Example.increment_score(pid)
+      Example.increment_score(pid)
+      assert 4 == Example.read_score(pid)
 
-    def read_score(pid) do
-      GenServer.call(pid, :read_score)
-    end
-
-    @impl true
-    def init(user_name) do
-      {:ok, %__MODULE__{name: user_name, score: 0}}
-    end
-
-    @impl true
-    def handle_cast(:increment_score, state) do
-      {:noreply, update_in(state.score, &(&1 + 1))}
-    end
-
-    @impl true
-    def handle_call(:read_score, from, state) do
-      {:reply, state.score, state}
+      assert :ok == GenServer.stop(pid, :normal)
+      assert {:noproc, _} = catch_exit(Example.read_score(pid))
     end
   end
 end
