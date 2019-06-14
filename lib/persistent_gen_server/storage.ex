@@ -31,4 +31,14 @@ defmodule PersistentGenServer.Storage.ETS do
       other_result -> {:error, "invalid item stored in table of PersistentGenServer.Storage.ETS:", other_result}
     end
   end
+
+  # Used for test cleanup,
+  # but not very useful in general
+  # and thus not part of the public API
+  @doc false
+  def clear_all do
+    if :ets.whereis(__MODULE__) != :undefined do
+      :ets.delete(__MODULE__)
+    end
+  end
 end
