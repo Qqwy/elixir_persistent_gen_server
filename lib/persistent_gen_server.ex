@@ -68,7 +68,8 @@ defmodule PersistentGenServer do
   end
 
   def init({module, init_args, :revive, state}) do
-    PersistentGenServer.Registry.register_name({module, init_args}, self())
+    # PersistentGenServer.Registry.register_name({module, init_args}, self())
+    Registry.register(PersistentGenServer.Registry, {module, init_args}, self())
     {:ok, state}
   end
 

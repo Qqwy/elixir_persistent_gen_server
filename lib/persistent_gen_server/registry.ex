@@ -14,6 +14,8 @@ defmodule PersistentGenServer.Registry do
           {:ok, val} ->
             IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
             {:ok, pid} = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: PersistentGenserver, start: {GenServer, :start_link, [PersistentGenServer, {module_name, init_args, :revive, val}]}}) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
+            IO.inspect({"NEW PID:", pid})
+            # Registry.register(__MODULE__, {module_name, init_args}, pid)
             pid
           :not_found ->
             IO.inspect({"Attempting to load module from persistency, but was not found", module_name, init_args})
@@ -26,16 +28,26 @@ defmodule PersistentGenServer.Registry do
 
   @doc false
   def register_name({module, init_args}, pid) do
+    IO.puts "REGISTER NAME called!"
+    IO.inspect({{module, init_args}, pid}, label: :register_name)
     Registry.register_name({__MODULE__, {module, init_args}}, pid)
   end
 
   @doc false
   def send({module, key}, msg) do
-    Registry.send({__MODULE__, {module, key}}, msg)
+    IO.puts "SEND called!"
+    IO.inspect({{module, key}, msg}, label: :send)
+    case whereis_name({module, key}) do
+      pid when is_pid(pid) -> Kernel.send(pid, msg)
+      other -> other
+    end
+    # Registry.send({__MODULE__, {module, key}}, msg)
   end
 
   @doc false
   def unregister_name({module, key}) do
+    IO.puts "UNREGISTER NAME called!"
+    IO.inspect({module, key}, label: :unregister_name)
     Registry.unregister_name({__MODULE__, {module, key}})
   end
 end
