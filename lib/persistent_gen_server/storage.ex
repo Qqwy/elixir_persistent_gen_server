@@ -2,6 +2,8 @@ defmodule PersistentGenServer.Storage do
   @callback store(tuple(), any()) :: :ok | {:error, reason :: any()}
 
   @callback read(tuple()) :: {:ok, any()} | :not_found | {:error, reason :: any()}
+
+  @callback wipe(tuple()) :: :ok | {:error, reason :: any()}
 end
 
 defmodule PersistentGenServer.Storage.ETS do
@@ -9,9 +11,7 @@ defmodule PersistentGenServer.Storage.ETS do
 
   @impl true
   def store(identity_tuple, value) do
-    if :ets.whereis(__MODULE__) == :undefined  do
-      :ets.new(__MODULE__, [:set, :public, :named_table])
-    end
+    ensure_table_exists!()
 
     IO.inspect({identity_tuple, value}, label: "storing")
 
@@ -21,15 +21,20 @@ defmodule PersistentGenServer.Storage.ETS do
 
   @impl true
   def read(identity_tuple) do
-    if :ets.whereis(__MODULE__) == :undefined  do
-      :ets.new(__MODULE__, [:set, :public, :named_table])
-    end
+    ensure_table_exists!()
     IO.inspect(:ets.tab2list(__MODULE__), label: "reading")
     case :ets.lookup(__MODULE__, identity_tuple) do
       [] -> :not_found
       [{_, state}] -> {:ok, state}
       other_result -> {:error, "invalid item stored in table of PersistentGenServer.Storage.ETS:", other_result}
     end
+  end
+
+  @impl true
+  def wipe(identity_tuple) do
+    ensure_table_exists!()
+    true = :ets.delete(__MODULE__, identity_tuple)
+    :ok
   end
 
   # Used for test cleanup,
@@ -39,6 +44,12 @@ defmodule PersistentGenServer.Storage.ETS do
   def clear_all do
     if :ets.whereis(__MODULE__) != :undefined do
       :ets.delete(__MODULE__)
+    end
+  end
+
+  defp ensure_table_exists! do
+    if :ets.whereis(__MODULE__) == :undefined  do
+      :ets.new(__MODULE__, [:set, :public, :named_table])
     end
   end
 end

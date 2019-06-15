@@ -57,6 +57,7 @@ defmodule PersistentGenServer do
     {:ok, gen_server_options[:name]}
   end
 
+  @impl true
   def init({module, init_args}) do
     case PersistentGenServer.Storage.ETS.read({module, init_args}) do
       {:ok, state} ->
@@ -92,6 +93,7 @@ defmodule PersistentGenServer do
   #   {:ok, state}
   # end
 
+  @impl true
   def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
     IO.inspect({call, from, state}, label: "handle_call")
     # put_in state.internal_state, module.handle_call(call, internal_state)
@@ -119,6 +121,7 @@ defmodule PersistentGenServer do
     end
   end
 
+  @impl true
   def handle_cast(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
     case module.handle_cast(call, internal_state) do
       {:noreply, new_state} ->
@@ -134,6 +137,7 @@ defmodule PersistentGenServer do
     end
   end
 
+  @impl true
   def handle_continue(continue, state = %__MODULE__{module: module, internal_state: internal_state}) do
     case module.handle_continue(continue, internal_state) do
       {:noreply, new_state} ->
@@ -149,6 +153,7 @@ defmodule PersistentGenServer do
     end
   end
 
+  @impl true
   def handle_info(msg, state = %__MODULE__{module: module, internal_state: internal_state}) do
     case module.handle_info(msg, internal_state) do
       {:noreply, new_state} ->
@@ -164,10 +169,10 @@ defmodule PersistentGenServer do
     end
   end
 
-  defp persist!(state) do
+  defp persist!(state = %__MODULE__{}) do
     IO.inspect state, label: "persisting state"
 
-    # TODO nicer error handling
+    # TODO nicer error handling?
     :ok = state.storage_impl.store({state.module, state.init_args}, state)
   end
 
@@ -176,5 +181,22 @@ defmodule PersistentGenServer do
     persist!(new_state)
 
     new_state
+  end
+
+  @impl true
+  def terminate(reason, state) do
+    IO.inspect({reason, state}, label: "Terminate called!")
+    case reason do
+      :normal ->
+        wipe!(state)
+        :ok
+      _ ->
+        :ok
+    end
+  end
+
+  defp wipe!(state = %__MODULE__{}) do
+    # TODO nicer error handling?
+    :ok = state.storage_impl.wipe({state.module, state.init_args})
   end
 end

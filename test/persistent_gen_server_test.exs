@@ -44,7 +44,8 @@ defmodule PersistentGenServerTest do
       assert 4 == Example.read_score(pid)
 
       assert :ok == GenServer.stop(pid, :normal)
-      # assert {:shutdown, _} = catch_exit(Example.read_score(pid))
+
+      assert 0 == Example.read_score(pid)
     end
 
     test "Server will restart if not stopped with ':normal' reason " do
@@ -59,11 +60,13 @@ defmodule PersistentGenServerTest do
       Example.increment_score(pid)
       assert 4 == Example.read_score(pid)
 
+      # non-normal exits will keep state persisted.
       assert :ok == GenServer.stop(pid, :asdf)
-
       assert 4 == Example.read_score(pid)
 
-      # assert :ok == GenServer.stop(pid, :normal)
+      # normal exits reset state.
+      assert :ok == GenServer.stop(pid, :normal)
+      assert 0 == Example.read_score(pid)
     end
   end
 end
