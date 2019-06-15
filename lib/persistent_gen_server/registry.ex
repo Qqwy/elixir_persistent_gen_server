@@ -8,7 +8,7 @@ defmodule PersistentGenServer.Registry do
   @doc false
   def whereis_name({module_name, init_args, config}) do
     IO.inspect({module_name, init_args}, label: "whereis_name called!")
-    case Registry.whereis_name({__MODULE__, {module_name, init_args}}) do
+    case config.subregistry.whereis_name({__MODULE__, {module_name, init_args}}) do
       pid when is_pid(pid) ->
         pid
       :undefined ->
@@ -41,10 +41,10 @@ defmodule PersistentGenServer.Registry do
   end
 
   @doc false
-  def register_name({module, init_args, _config}, pid) do
+  def register_name({module, init_args, config}, pid) do
     IO.puts "REGISTER NAME called!"
     IO.inspect({{module, init_args}, pid}, label: :register_name)
-    Registry.register_name({__MODULE__, {module, init_args}}, pid)
+    config.subregistry.register_name({__MODULE__, {module, init_args}}, pid)
   end
 
   @doc false
@@ -61,9 +61,9 @@ defmodule PersistentGenServer.Registry do
   end
 
   @doc false
-  def unregister_name({module, key, _config}) do
+  def unregister_name({module, key, config}) do
     IO.puts "UNREGISTER NAME called!"
     IO.inspect({module, key}, label: :unregister_name)
-    Registry.unregister_name({__MODULE__, {module, key}})
+    config.subregistry.unregister_name({__MODULE__, {module, key}})
   end
 end

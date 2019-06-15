@@ -6,17 +6,15 @@ defmodule PersistentGenServer do
 
   # TODO possible dimensions for configurability:
 
-  - Swap out process registries that PersistentGenServer.Registry wraps.
-  - Optionally Auto-start GenServers when called for the first time with a `:via`-tuple when not persisted yet. (Current behaviour is to require at least once a manual start using `start`/ `start_link`)
-  - Let users choose between: (temporary/transient/permanent)
+  - [ ] Swap out process registries that PersistentGenServer.Registry wraps.
+  - [ ] Let users choose between: (temporary/transient/permanent)
     - Wipe persistency for GenServer when it stops normally or crashes.
     - Wipe persistency for GenServer only when it stops normally.
     - Even restart GenServer from persistency when it crashed before.
-  - Other storage adapters.
-  - Timeout length before a process petrifies itself.
-  - Only write to cache on `terminate` vs during each handle_* for efficienty vs fault-tolerancy?
-  - A mapping function between the actual state and the state-to-be-persisted/reloaded, to hide ephemeral parts.
-
+  - [x] Other storage adapters.
+  - [ ] Timeout length before a process petrifies itself.
+  - [ ] Only write to cache on `terminate` vs during each handle_* for efficienty vs fault-tolerancy?
+  - [ ] A mapping function between the actual state and the state-to-be-persisted/reloaded, to hide ephemeral parts.
 
   # Things to figure out:
 
@@ -28,15 +26,48 @@ defmodule PersistentGenServer do
   defmodule Config do
     require Specify
     Specify.defconfig do
+      @doc """
+      The actual storage implementation that will be used
+      to persist the state of the running GenServer,
+      so that it can be revived when it stopped.
+
+      Should be a module name implementing the `PersistentGenServer.Storage` behaviour.
+      """
       field :storage_implementation, :atom, default: PersistentGenServer.Storage.ETS
+
+      @doc """
+      A timeout before the GenServer auto-unloads ('petrifies') itself.
+
+      '0' means: indefinite.
+      TODO maybe change to`:infinity`?
+      """
       field :petrification_timeout, :integer, default: 0
+
+      @doc """
+      The atom name (or module name) of the Dynamic Supervisor
+      that should supervise this GenServer.
+      """
       field :dynamic_supervisor, :atom, default: PersistentGenServer.GlobalSupervisor
+
+      @doc """
+      The process registry that is used to keep track of which
+      processes are currently in a non-petrified state.
+
+      By default the Elixir `Registry`-module is used,
+      which works well, except in Special Circumstances.
+      (for instance: on a distributed system this might need more thought).
+      """
+      field :subregistry, :atom, default: Registry
+
+      @doc """
+      These options are used whenever the server is (re)started.
+      See `GenServer.start_link/3`'s "Options" section for the allowed values.
+      """
       field :gen_server_options, {:list, :term}, default: []
     end
   end
 
   defstruct [:module, :init_args, :internal_state, config: Config.load()]
-
 
   defp via_pid(module, init_args, config) do
     {:via, __MODULE__.Registry, {module, init_args, config}}
