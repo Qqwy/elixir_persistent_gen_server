@@ -4,12 +4,12 @@ defmodule Example do
   defstruct [name: "", score: 42]
   use GenServer
 
-  def start_link_ephemeral(name) do
-    GenServer.start_link(__MODULE__, name)
+  def start_ephemeral(name) do
+    GenServer.start(__MODULE__, name)
   end
 
-  def start_link_persistent(name) do
-    PersistentGenServer.start_link(__MODULE__, name)
+  def start_persistent(name) do
+    PersistentGenServer.start(__MODULE__, name)
   end
 
   def increment_score(pid) do

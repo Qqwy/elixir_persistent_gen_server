@@ -81,10 +81,13 @@ defmodule PersistentGenServer do
   can store and re-use to call the persistent GenServer later, even if stopped running in the meantime.
 
 
-  In case you are wondering: There is no `start/3` alternative because it does not make sense
-  to start a persistent GenServer without supervision.
+  There is no `start_link/2` because a started PersistentGenServer is always
+  started under a DynamicSupervisor.
+  This is to ensure that after the process was unloaded ('petrified') and reloaded ('revived'),
+  it still has a place in the supervision tree.
+
   """
-  def start_link(module, init_args, gen_server_options \\ []) do
+  def start(module, init_args, gen_server_options \\ []) do
     # TODO raise for unsupported GenServer options like `:name`.
     config = parse_config(gen_server_options)
 

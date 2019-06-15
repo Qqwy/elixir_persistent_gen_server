@@ -14,7 +14,7 @@ defmodule PersistentGenServerTest do
 
   describe "the example GenServer works as expected without being wrapped by PersistentGenServer" do
     test "Basic operation" do
-      {:ok, pid} = Example.start_link_ephemeral("Vorpal")
+      {:ok, pid} = Example.start_ephemeral("Vorpal")
 
       assert 0 == Example.read_score(pid)
       Example.increment_score(pid)
@@ -32,7 +32,7 @@ defmodule PersistentGenServerTest do
 
   describe "Wrapping the Example GenServer with the PersistentGenServer" do
     test "Basic behaviour is unaltered" do
-      {:ok, pid} = Example.start_link_persistent("Vorpal")
+      {:ok, pid} = Example.start_persistent("Vorpal")
 
       assert 0 == Example.read_score(pid)
       Example.increment_score(pid)
@@ -49,7 +49,7 @@ defmodule PersistentGenServerTest do
     end
 
     test "Server will restart if not stopped with ':normal' reason " do
-      {:ok, pid} = Example.start_link_persistent("Vorpal")
+      {:ok, pid} = Example.start_persistent("Vorpal")
 
       assert 0 == Example.read_score(pid)
       Example.increment_score(pid)
