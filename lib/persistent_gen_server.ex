@@ -25,8 +25,21 @@ defmodule PersistentGenServer do
 
   """
 
-  defstruct [:module, :init_args, :internal_state, storage_impl: PersistentGenServer.Storage.ETS]
+  defmodule Config do
+    require Specify
+    Specify.defconfig do
+      field :storage_implementation, :atom, default: PersistentGenServer.Storage.ETS
+      field :petrification_timeout, :integer, default: 0
+      field :dynamic_supervisor, :atom, default: PersistentGenServer.GlobalSupervisor
+    end
+  end
 
+  defstruct [:module, :init_args, :internal_state, config: Config.load()]
+
+
+  defp via_pid(module, init_args, config) do
+    {:via, __MODULE__.Registry, {module, init_args, config}}
+  end
 
   @doc """
   Starts the GenServer `module` with `init_args`.
@@ -39,13 +52,16 @@ defmodule PersistentGenServer do
     # TODO extract/use persistency options
     # TODO don't start if GenServer already is started?
     # TODO load from persistency if persisted before
-    gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
+    # gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
+    # TODO raise for unsupported GenServer options like `:name`.
+    config = Config.load_explicit(gen_server_options[:persistent_gen_server_options] || [])
+
     # NOTE: WE piggyback the call to the module's init in the call to our init, in the call to `GenServer.start_llink` in the child spec expected for DynamicSupervisor.start_child
     # Can possibly be refactored somewhat :-)
-    res = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args}]}})
+    res = DynamicSupervisor.start_child(config.dynamic_supervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args, config}, gen_server_options]}})
     IO.inspect(res, label: "DynamicSupervisor result")
 
-    {:ok, gen_server_options[:name]}
+    {:ok, via_pid(module, init_args, config)}
   end
 
   def start(module, init_args, gen_server_options \\ []) do
@@ -58,16 +74,16 @@ defmodule PersistentGenServer do
   end
 
   @impl true
-  def init({module, init_args}) do
+  def init({module, init_args, config}) do
     case PersistentGenServer.Storage.ETS.read({module, init_args}) do
       {:ok, state} ->
-        PersistentGenServer.Registry.register_name({module, init_args}, self())
+        PersistentGenServer.Registry.register_name({module, init_args, state.config}, self())
         {:ok, state}
       :not_found ->
         with {:ok, internal_state} <- module.init(init_args),
-             state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
+             state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state, config: config},
              :ok <- persist!(state) do
-          PersistentGenServer.Registry.register_name({module, init_args}, self())
+          PersistentGenServer.Registry.register_name({module, init_args, config}, self())
           {:ok, state}
         end
       {:error, reason} ->
@@ -173,7 +189,7 @@ defmodule PersistentGenServer do
     IO.inspect state, label: "persisting state"
 
     # TODO nicer error handling?
-    :ok = state.storage_impl.store({state.module, state.init_args}, state)
+    :ok = state.config.storage_implementation.store({state.module, state.init_args}, state)
   end
 
   defp update_and_persist(old_state, new_internal_state) do
@@ -197,6 +213,6 @@ defmodule PersistentGenServer do
 
   defp wipe!(state = %__MODULE__{}) do
     # TODO nicer error handling?
-    :ok = state.storage_impl.wipe({state.module, state.init_args})
+    :ok = state.config.storage_implementation.wipe({state.module, state.init_args})
   end
 end

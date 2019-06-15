@@ -6,17 +6,17 @@ defmodule PersistentGenServer.Registry do
   """
 
   @doc false
-  def whereis_name({module_name, init_args}) do
+  def whereis_name({module_name, init_args, config}) do
     IO.inspect({module_name, init_args}, label: "whereis_name called!")
     case Registry.whereis_name({__MODULE__, {module_name, init_args}}) do
       pid when is_pid(pid) ->
         pid
       :undefined ->
-        attempt_revive({module_name, init_args})
+        attempt_revive({module_name, init_args, config})
     end
   end
 
-  defp attempt_revive({module_name, init_args}) do
+  defp attempt_revive({module_name, init_args, config}) do
     # case PersistentGenServer.Storage.ETS.read({module_name, init_args}) do
     #   {:ok, val} ->
     #     IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
@@ -26,7 +26,7 @@ defmodule PersistentGenServer.Registry do
             %{id: PersistentGenserver,
               start: {GenServer,
                       :start_link,
-                      [PersistentGenServer, {module_name, init_args}, ]}}
+                      [PersistentGenServer, {module_name, init_args, config}, ]}}
           ) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
         IO.inspect({"NEW PID:", pid})
         pid
@@ -41,17 +41,17 @@ defmodule PersistentGenServer.Registry do
   end
 
   @doc false
-  def register_name({module, init_args}, pid) do
+  def register_name({module, init_args, _config}, pid) do
     IO.puts "REGISTER NAME called!"
     IO.inspect({{module, init_args}, pid}, label: :register_name)
     Registry.register_name({__MODULE__, {module, init_args}}, pid)
   end
 
   @doc false
-  def send({module, key}, msg) do
+  def send({module, key, config}, msg) do
     IO.puts "SEND called!"
     IO.inspect({{module, key}, msg}, label: :send)
-    case whereis_name({module, key}) do
+    case whereis_name({module, key, config}) do
       pid when is_pid(pid) ->
         IO.inspect(pid, label: "SEND called and process potentially revived!")
         Kernel.send(pid, msg)
@@ -61,7 +61,7 @@ defmodule PersistentGenServer.Registry do
   end
 
   @doc false
-  def unregister_name({module, key}) do
+  def unregister_name({module, key, _config}) do
     IO.puts "UNREGISTER NAME called!"
     IO.inspect({module, key}, label: :unregister_name)
     Registry.unregister_name({__MODULE__, {module, key}})
