@@ -8,21 +8,33 @@ defmodule PersistentGenServer.Registry do
   @doc false
   def whereis_name({module_name, init_args}) do
     case Registry.whereis_name({__MODULE__, {module_name, init_args}}) do
-      pid when is_pid(pid) -> pid
+      pid when is_pid(pid) ->
+        pid
       :undefined ->
-        case PersistentGenServer.Storage.ETS.read({module_name, init_args}) do
-          {:ok, val} ->
-            IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
-            {:ok, pid} = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: PersistentGenserver, start: {GenServer, :start_link, [PersistentGenServer, {module_name, init_args, :revive, val}]}}) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
-            IO.inspect({"NEW PID:", pid})
-            # Registry.register(__MODULE__, {module_name, init_args}, pid)
-            pid
-          :not_found ->
-            IO.inspect({"Attempting to load module from persistency, but was not found", module_name, init_args})
-            :undefined
-          {:error, reason} ->
-            raise reason
-        end
+        attempt_revive({module_name, init_args})
+    end
+  end
+
+  defp attempt_revive({module_name, init_args}) do
+    case PersistentGenServer.Storage.ETS.read({module_name, init_args}) do
+      {:ok, val} ->
+        IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
+        {:ok, pid} =
+          DynamicSupervisor.start_child(
+            PersistentGenServer.GlobalSupervisor,
+            %{id: PersistentGenserver,
+              start: {GenServer,
+                      :start_link,
+                      [PersistentGenServer, {module_name, init_args, :revive, val}]}}
+          ) # , [name: {:via, PersistentGenServer.Registry, {module_name, init_args}}])
+        IO.inspect({"NEW PID:", pid})
+        pid
+      :not_found ->
+        IO.inspect({"Attempting to load module from persistency, but was not found", module_name, init_args})
+        :undefined
+      {:error, reason} ->
+        IO.inspect({"Error: ", reason})
+        raise reason
     end
   end
 
