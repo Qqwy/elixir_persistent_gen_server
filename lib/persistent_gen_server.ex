@@ -31,6 +31,7 @@ defmodule PersistentGenServer do
       field :storage_implementation, :atom, default: PersistentGenServer.Storage.ETS
       field :petrification_timeout, :integer, default: 0
       field :dynamic_supervisor, :atom, default: PersistentGenServer.GlobalSupervisor
+      field :gen_server_options, {:list, :term}, default: []
     end
   end
 
@@ -47,30 +48,27 @@ defmodule PersistentGenServer do
   This function returns `{:ok, pid}` where `pid` is actually
   a `{:via, PersistentGenServer.Registry, ...}` tuple, which you
   can store and re-use to call the persistent GenServer later, even if stopped running in the meantime.
+
+
+  In case you are wondering: There is no `start/3` alternative because it does not make sense
+  to start a persistent GenServer without supervision.
   """
   def start_link(module, init_args, gen_server_options \\ []) do
-    # TODO extract/use persistency options
-    # TODO don't start if GenServer already is started?
-    # TODO load from persistency if persisted before
-    # gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
     # TODO raise for unsupported GenServer options like `:name`.
-    config = Config.load_explicit(gen_server_options[:persistent_gen_server_options] || [])
+    config = parse_config(gen_server_options)
 
     # NOTE: WE piggyback the call to the module's init in the call to our init, in the call to `GenServer.start_llink` in the child spec expected for DynamicSupervisor.start_child
-    # Can possibly be refactored somewhat :-)
-    res = DynamicSupervisor.start_child(config.dynamic_supervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args, config}, gen_server_options]}})
-    IO.inspect(res, label: "DynamicSupervisor result")
-
-    {:ok, via_pid(module, init_args, config)}
+    with {:ok, res} <- DynamicSupervisor.start_child(config.dynamic_supervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args, config}, gen_server_options]}}) do
+      IO.inspect(res, label: "DynamicSupervisor result")
+      {:ok, via_pid(module, init_args, config)}
+    end
   end
 
-  def start(module, init_args, gen_server_options \\ []) do
-    # TODO extract/use persistency options
-    # TODO don't start if GenServer already is started?
-    # TODO load from persistency if persisted before
-    GenServer.start(__MODULE__, {module, init_args, :initial}, gen_server_options)
-
-    {:ok, gen_server_options[:name]}
+  defp parse_config(gen_server_options) do
+    {passed_in_config, gen_server_options} = pop_in(gen_server_options[:persistent_gen_server_options])
+    (passed_in_config || [])
+    |> put_in([:gen_server_options], gen_server_options)
+    |> Config.load_explicit
   end
 
   @impl true
@@ -91,30 +89,9 @@ defmodule PersistentGenServer do
     end
   end
 
-  # def init({module, init_args, :initial}) do
-  #   IO.inspect({module, init_args, :initial}, label: "Initial init")
-  #   with {:ok, internal_state} <- module.init(init_args),
-  #        state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
-  #          :ok <- persist!(state) # ,
-  #          # PersistentGenServer.Registry.register_name({module, init_args}, self())
-  #     do
-  #          {:ok, state}
-  #   end
-  # end
-
-  # def init({module, init_args, :revive, state}) do
-  #   IO.inspect({module, init_args, :revive, state}, label: "Reviving!")
-  #   PersistentGenServer.Registry.register_name({module, init_args}, self())
-  #   # Registry.register(PersistentGenServer.Registry, {module, init_args}, self())
-  #   {:ok, state}
-  # end
-
   @impl true
   def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
     IO.inspect({call, from, state}, label: "handle_call")
-    # put_in state.internal_state, module.handle_call(call, internal_state)
-    # # TODO persist
-    # |> persist()
     case module.handle_call(call, from, internal_state) do
       {:reply, reply, new_state} ->
         {:reply, reply, update_and_persist(state, new_state)}
@@ -127,10 +104,8 @@ defmodule PersistentGenServer do
         {:noreply, reply, update_and_persist(state, new_state), extra}
 
       {:stop, reason, reply, new_state} ->
-        # TODO: Remove state from persistency?
         {:stop, reason, reply, update_and_persist(state, new_state)}
       {:stop, reason, new_state} ->
-        # TODO: Remove state from persistency?
         {:stop, reason, update_and_persist(state, new_state)}
       other ->
         other
@@ -146,7 +121,6 @@ defmodule PersistentGenServer do
         {:noreply, update_and_persist(state, new_state), extra}
 
       {:stop, reason, new_state} ->
-        # TODO: Remove state from persistency?
         {:stop, reason, update_and_persist(state, new_state)}
       other ->
         other
@@ -162,7 +136,6 @@ defmodule PersistentGenServer do
         {:noreply, update_and_persist(state, new_state), extra}
 
       {:stop, reason, new_state} ->
-        # TODO: Remove state from persistency?
         {:stop, reason, update_and_persist(state, new_state)}
       other ->
         other
@@ -178,7 +151,6 @@ defmodule PersistentGenServer do
         {:noreply, update_and_persist(state, new_state), extra}
 
       {:stop, reason, new_state} ->
-        # TODO: Remove state from persistency?
         {:stop, reason, update_and_persist(state, new_state)}
       other ->
         other

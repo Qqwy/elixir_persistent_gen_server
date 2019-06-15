@@ -22,7 +22,7 @@ defmodule PersistentGenServer.Registry do
     #     IO.inspect({"Loading GenServer from persistency", module_name, init_args, val})
         {:ok, pid} =
           DynamicSupervisor.start_child(
-            PersistentGenServer.GlobalSupervisor,
+            config.dynamic_supervisor,
             %{id: PersistentGenserver,
               start: {GenServer,
                       :start_link,
