@@ -42,7 +42,7 @@ defmodule PersistentGenServer do
     gen_server_options = put_in(gen_server_options[:name], {:via, PersistentGenServer.Registry, {module, init_args}})
     # NOTE: WE piggyback the call to the module's init in the call to our init, in the call to `GenServer.start_llink` in the child spec expected for DynamicSupervisor.start_child
     # Can possibly be refactored somewhat :-)
-    res = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args, :initial}, gen_server_options]}})
+    res = DynamicSupervisor.start_child(PersistentGenServer.GlobalSupervisor, %{id: __MODULE__, start: {GenServer, :start_link, [__MODULE__, {module, init_args}]}})
     IO.inspect(res, label: "DynamicSupervisor result")
 
     {:ok, gen_server_options[:name]}
@@ -57,23 +57,43 @@ defmodule PersistentGenServer do
     {:ok, gen_server_options[:name]}
   end
 
-  def init({module, init_args, :initial}) do
-    with {:ok, internal_state} <- module.init(init_args),
-         state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
-           :ok <- persist!(state) # ,
-           # PersistentGenServer.Registry.register_name({module, init_args}, self())
-      do
-           {:ok, state}
+  def init({module, init_args}) do
+    case PersistentGenServer.Storage.ETS.read({module, init_args}) do
+      {:ok, state} ->
+        PersistentGenServer.Registry.register_name({module, init_args}, self())
+        {:ok, state}
+      :not_found ->
+        with {:ok, internal_state} <- module.init(init_args),
+             state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
+             :ok <- persist!(state) do
+          PersistentGenServer.Registry.register_name({module, init_args}, self())
+          {:ok, state}
+        end
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  def init({module, init_args, :revive, state}) do
-    PersistentGenServer.Registry.register_name({module, init_args}, self())
-    # Registry.register(PersistentGenServer.Registry, {module, init_args}, self())
-    {:ok, state}
-  end
+  # def init({module, init_args, :initial}) do
+  #   IO.inspect({module, init_args, :initial}, label: "Initial init")
+  #   with {:ok, internal_state} <- module.init(init_args),
+  #        state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state},
+  #          :ok <- persist!(state) # ,
+  #          # PersistentGenServer.Registry.register_name({module, init_args}, self())
+  #     do
+  #          {:ok, state}
+  #   end
+  # end
+
+  # def init({module, init_args, :revive, state}) do
+  #   IO.inspect({module, init_args, :revive, state}, label: "Reviving!")
+  #   PersistentGenServer.Registry.register_name({module, init_args}, self())
+  #   # Registry.register(PersistentGenServer.Registry, {module, init_args}, self())
+  #   {:ok, state}
+  # end
 
   def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
+    IO.inspect({call, from, state}, label: "handle_call")
     # put_in state.internal_state, module.handle_call(call, internal_state)
     # # TODO persist
     # |> persist()

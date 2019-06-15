@@ -24,7 +24,7 @@ defmodule PersistentGenServer.Storage.ETS do
     if :ets.whereis(__MODULE__) == :undefined  do
       :ets.new(__MODULE__, [:set, :public, :named_table])
     end
-
+    IO.inspect(:ets.tab2list(__MODULE__), label: "reading")
     case :ets.lookup(__MODULE__, identity_tuple) do
       [] -> :not_found
       [{_, state}] -> {:ok, state}
