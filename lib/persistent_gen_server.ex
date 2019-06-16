@@ -40,9 +40,6 @@ defmodule PersistentGenServer do
 
       @doc """
       A timeout before the GenServer auto-unloads ('petrifies') itself.
-
-      '0' means: indefinite.
-      TODO maybe change to`:infinity`?
       """
       field(:petrification_timeout, :timeout, default: 60_000)
 
