@@ -20,6 +20,7 @@ defmodule PersistentGenServer do
   # Things to figure out:
 
   - How to re-create original link/monitor structure? Is there a way for a process to keep track of its supervision?
+  - Fix race condition with petrification?
 
 
   """
@@ -43,7 +44,7 @@ defmodule PersistentGenServer do
       '0' means: indefinite.
       TODO maybe change to`:infinity`?
       """
-      field(:petrification_timeout, :integer, default: 1)
+      field(:petrification_timeout, :timeout, default: 60_000)
 
       @doc """
       The atom name (or module name) of the Dynamic Supervisor
