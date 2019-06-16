@@ -5,11 +5,11 @@ defmodule PersistentGenServerTest do
   use ExUnit.Case, async: false
 
   setup do
-    on_exit fn ->
-      PersistentGenServer.Storage.ETS.clear_all
+    on_exit(fn ->
+      PersistentGenServer.Storage.ETS.clear_all()
       Application.stop(:persistent_gen_server)
       Application.start(:persistent_gen_server)
-    end
+    end)
   end
 
   describe "the example GenServer works as expected without being wrapped by PersistentGenServer" do

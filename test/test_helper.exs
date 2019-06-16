@@ -1,7 +1,7 @@
 ExUnit.start()
 
 defmodule Example do
-  defstruct [name: "", score: 42]
+  defstruct name: "", score: 42
   use GenServer
 
   def start_ephemeral(name) do
@@ -35,4 +35,3 @@ defmodule Example do
     {:reply, state.score, state}
   end
 end
-

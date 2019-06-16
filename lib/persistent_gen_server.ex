@@ -6,13 +6,13 @@ defmodule PersistentGenServer do
 
   # TODO possible dimensions for configurability:
 
-  - [ ] Swap out process registries that PersistentGenServer.Registry wraps.
+  - [x] Swap out process registries that PersistentGenServer.Registry wraps.
   - [ ] Let users choose between: (temporary/transient/permanent)
     - Wipe persistency for GenServer when it stops normally or crashes.
     - Wipe persistency for GenServer only when it stops normally.
     - Even restart GenServer from persistency when it crashed before.
   - [x] Other storage adapters.
-  - [ ] Timeout length before a process petrifies itself.
+  - [x] Timeout length before a process petrifies itself.
   - [ ] Only write to cache on `terminate` vs during each handle_* for efficienty vs fault-tolerancy?
   - [ ] A mapping function between the actual state and the state-to-be-persisted/reloaded, to hide ephemeral parts.
 
@@ -105,6 +105,8 @@ defmodule PersistentGenServer do
     |> Config.load_explicit
   end
 
+  # Fills state from cache if avaiable.
+  # If not, calles wrapped module's init.
   @impl true
   def init({module, init_args, config}) do
     case PersistentGenServer.Storage.ETS.read({module, init_args}) do
@@ -112,18 +114,27 @@ defmodule PersistentGenServer do
         PersistentGenServer.Registry.register_name({module, init_args, state.config}, self())
         {:ok, state}
       :not_found ->
-        with {:ok, internal_state} <- module.init(init_args),
-             state = %__MODULE__{module: module, init_args: init_args, internal_state: internal_state, config: config},
-             :ok <- persist!(state),
-             :yes = PersistentGenServer.Registry.register_name({module, init_args, config}, self()),
-             state = reset_petrification_timeout(state) do
-          {:ok, state}
-        end
+        init_new(module, init_args, config)
       {:error, reason} ->
         {:error, reason}
     end
   end
 
+  defp init_new(module, init_args, config) do
+  with  {:ok, internal_state} <- module.init(init_args),
+         state = %__MODULE__{
+       module: module,
+       init_args: init_args,
+       internal_state: internal_state,
+       config: config},
+         :ok <- persist!(state),
+         :yes = PersistentGenServer.Registry.register_name({module, init_args, config}, self()),
+         state = reset_petrification_timeout(state) do
+    {:ok, state}
+       end
+  end
+
+  # Simple Pass-through to wrapped module
   @impl true
   def handle_call(call, from, state = %__MODULE__{module: module, internal_state: internal_state}) do
     IO.inspect({call, from, state}, label: "handle_call")
@@ -147,6 +158,7 @@ defmodule PersistentGenServer do
     end
   end
 
+  # Simple Pass-through to wrapped module
   @impl true
   def handle_cast(call, state = %__MODULE__{module: module, internal_state: internal_state}) do
     case module.handle_cast(call, internal_state) do
@@ -162,6 +174,7 @@ defmodule PersistentGenServer do
     end
   end
 
+  # Simple Pass-through to wrapped module
   @impl true
   def handle_continue(continue, state = %__MODULE__{module: module, internal_state: internal_state}) do
     case module.handle_continue(continue, internal_state) do
@@ -177,6 +190,8 @@ defmodule PersistentGenServer do
     end
   end
 
+  # In the special petrification case, shuts down this process for petrification.
+  # otherwise, passes through to wrapped module.
   @impl true
   def handle_info(:"PersistentGenServer.petrification", state = %__MODULE__{module: module, internal_state: internal_state}) do
     IO.puts("Petrifying!")
@@ -225,6 +240,12 @@ defmodule PersistentGenServer do
     end
   end
 
+  # In the special 'petrification' case,
+  # shuts down server without notice (since it will be started again later.)
+  #
+  # in normal shutdown: wipes server from cache.
+  # in exceptional cases: Probably `terminate` is not called at all,
+  # but if it is, we only pass on to internal implementation.
   @impl true
   def terminate(reason, state) do
     IO.inspect({reason, state}, label: "Terminate called!")
@@ -244,5 +265,13 @@ defmodule PersistentGenServer do
   defp wipe!(state = %__MODULE__{}) do
     # TODO nicer error handling?
     :ok = state.config.storage_implementation.wipe({state.module, state.init_args})
+  end
+
+  # A simple Pass-through to the module's implementation.
+  @impl true
+  def code_change(old, state, extra) do
+    with {:ok, new_internal_state} <- state.module.code_change(old, state.internal_state, extra) do
+      {:ok, put_in(state.internal_state, new_internal_state)}
+    end
   end
 end

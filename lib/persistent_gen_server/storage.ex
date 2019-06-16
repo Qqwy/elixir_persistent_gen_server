@@ -23,10 +23,16 @@ defmodule PersistentGenServer.Storage.ETS do
   def read(identity_tuple) do
     ensure_table_exists!()
     IO.inspect(:ets.tab2list(__MODULE__), label: "reading")
+
     case :ets.lookup(__MODULE__, identity_tuple) do
-      [] -> :not_found
-      [{_, state}] -> {:ok, state}
-      other_result -> {:error, "invalid item stored in table of PersistentGenServer.Storage.ETS:", other_result}
+      [] ->
+        :not_found
+
+      [{_, state}] ->
+        {:ok, state}
+
+      other_result ->
+        {:error, "invalid item stored in table of PersistentGenServer.Storage.ETS:", other_result}
     end
   end
 
@@ -48,7 +54,7 @@ defmodule PersistentGenServer.Storage.ETS do
   end
 
   defp ensure_table_exists! do
-    if :ets.whereis(__MODULE__) == :undefined  do
+    if :ets.whereis(__MODULE__) == :undefined do
       :ets.new(__MODULE__, [:set, :public, :named_table])
     end
   end

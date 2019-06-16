@@ -4,7 +4,8 @@ defmodule PersistentGenServer.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: PersistentGenServer.Registry},
-      {DynamicSupervisor, name: PersistentGenServer.GlobalSupervisor, strategy: :one_for_one, restart: :transient}
+      {DynamicSupervisor,
+       name: PersistentGenServer.GlobalSupervisor, strategy: :one_for_one, restart: :transient}
     ]
 
     :ets.new(PersistentGenServer.Storage.ETS, [:set, :public, :named_table])
